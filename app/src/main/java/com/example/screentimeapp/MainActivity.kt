@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        sharedPreferences = getSharedPreferences("ScreenTimePrefs", Context.MODE_PRIVATE)
+        sharedPreferences = getSharedPreferences("ScreenTimePrefs", MODE_PRIVATE)
 
         // BroadcastReceiver ni faqat ilova ishga tushganda ro‘yxatdan o‘tkazamiz
         screenTimeReceiver = ScreenTimeReceiver()
@@ -51,9 +51,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ScreenTimeApp(sharedPreferences: SharedPreferences) {
-    var totalScreenTime by remember { mutableStateOf(sharedPreferences.getLong("totalScreenTime", 0)) }
+    var totalScreenTime by remember { mutableLongStateOf(sharedPreferences.getLong("totalScreenTime", 0)) }
     var isScreenOn by remember { mutableStateOf(sharedPreferences.getBoolean("isScreenOn", false)) }
-    var lastScreenOnTime by remember { mutableStateOf(sharedPreferences.getLong("lastScreenOnTime", 0)) }
 
     // 📌 UI har soniyada avtomatik yangilanadi
     LaunchedEffect(isScreenOn) {
@@ -107,7 +106,7 @@ class ScreenTimeReceiver : BroadcastReceiver() {
             editor.putLong("totalScreenTime", 0) // 🔄 Kun boshida reset
             editor.putLong("lastScreenOnTime", 0) // 🔄 Eski vaqtni tozalash
             editor.putString("lastSavedDate", currentDate) // 📌 Yangi sanani saqlash
-            editor.commit()
+            editor.apply()
         }
 
         when (intent.action) {
