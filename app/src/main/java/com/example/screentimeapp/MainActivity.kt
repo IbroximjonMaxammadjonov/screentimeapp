@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -53,22 +54,16 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ScreenTimeApp(sharedPreferences: SharedPreferences) {
-    var totalScreenTime by remember { mutableLongStateOf(sharedPreferences.getLong("totalScreenTime", 0)) }
-    val currentDate = getCurrentDate()
-    val savedDate = sharedPreferences.getString("lastSavedDate", "")
+    var totalScreenTime by remember { mutableStateOf(sharedPreferences.getLong("totalScreenTime", 0)) }
+    var isScreenOn by remember { mutableStateOf(sharedPreferences.getBoolean("isScreenOn", false)) }
+    var lastScreenOnTime by remember { mutableStateOf(sharedPreferences.getLong("lastScreenOnTime", 0)) }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            if (savedDate != currentDate) {
-                sharedPreferences.edit().putLong("totalScreenTime", 0).commit()
-                sharedPreferences.edit().putString("lastSavedDate", currentDate).commit()
-                totalScreenTime = 0
-                Log.d("ScreenTimeApp", "🔄 Yangi kun boshlandi, vaqt reset qilindi.")
-            }
-
-            totalScreenTime = sharedPreferences.getLong("totalScreenTime", 0)
-            Log.d("ScreenTimeApp", "📊 UI yangilandi: $totalScreenTime ms")
-            kotlinx.coroutines.delay(1000) // Har 1 soniyada yangilanadi
+    // 📌 UI har soniyada avtomatik yangilanadi
+    LaunchedEffect(isScreenOn) {
+        while (isScreenOn) {
+            val currentTime = System.currentTimeMillis()
+            totalScreenTime = sharedPreferences.getLong("totalScreenTime", 0) + (currentTime - lastScreenOnTime)
+            delay(1000) // ✅ delay ishlaydi, chunki LaunchedEffect suspend funksiya ichida
         }
     }
 
@@ -82,7 +77,7 @@ fun ScreenTimeApp(sharedPreferences: SharedPreferences) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Bugungi ekran yoniq vaqti:",
+            text = if (isScreenOn) "Ekran hozir yoqilgan 🔵" else "Ekran o‘chirilgan ⚫",
             fontSize = 20.sp
         )
         Spacer(modifier = Modifier.height(16.dp))
@@ -101,18 +96,15 @@ fun ScreenTimeApp(sharedPreferences: SharedPreferences) {
     }
 }
 
+
+
+
+
 // 📌 Bugungi sanani olish funksiyasi
 fun getCurrentDate(): String {
     val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     return dateFormat.format(Date())
 }
-
-
-
-
-
-
-
 
 class ScreenTimeReceiver : BroadcastReceiver() {
 
@@ -121,21 +113,12 @@ class ScreenTimeReceiver : BroadcastReceiver() {
 
         val sharedPreferences = context.getSharedPreferences("ScreenTimePrefs", Context.MODE_PRIVATE)
         val editor = sharedPreferences.edit()
-
         val currentTime = System.currentTimeMillis()
-        val currentDate = getCurrentDate() // 📌 Hozirgi kunni olish
-
-        val savedDate = sharedPreferences.getString("lastSavedDate", "") // 📌 Saqlangan sana
-        if (savedDate != currentDate) {
-            Log.d("ScreenTimeReceiver", "🔄 Yangi kun boshlandi, vaqtni reset qilamiz.")
-            editor.putLong("totalScreenTime", 0) // 🔄 Kun boshida reset
-            editor.putString("lastSavedDate", currentDate) // 📌 Yangi sanani saqlash
-            editor.commit()
-        }
 
         when (intent.action) {
             Intent.ACTION_SCREEN_ON -> {
                 editor.putLong("lastScreenOnTime", currentTime)
+                editor.putBoolean("isScreenOn", true) // 🔄 UIga signal berish uchun
                 editor.commit()
                 Log.d("ScreenTimeReceiver", "✅ SCREEN ON - Time saved: $currentTime")
             }
@@ -148,6 +131,7 @@ class ScreenTimeReceiver : BroadcastReceiver() {
                     val newTotalScreenTime = totalScreenTime + screenOnDuration
 
                     editor.putLong("totalScreenTime", newTotalScreenTime)
+                    editor.putBoolean("isScreenOn", false) // 🔄 UIga signal berish uchun
                     editor.commit()
 
                     Log.d("ScreenTimeReceiver", "✅ SCREEN OFF - Added time: $screenOnDuration, Total time: $newTotalScreenTime")
@@ -157,13 +141,8 @@ class ScreenTimeReceiver : BroadcastReceiver() {
             }
         }
     }
-
-    // 📌 Bugungi sanani olish funksiyasi
-    private fun getCurrentDate(): String {
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        return dateFormat.format(Date())
-    }
 }
+
 
 
 
